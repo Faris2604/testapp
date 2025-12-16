@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Frontend ECS Service
+
+Parameters:
+  ClusterName:
+    Type: String
+
+  ImageUrl:
+    Type: String
+
+  Subnets:
+    Type: List<String>
+
+  SecurityGroup:
+    Type: String
+
+  DesiredCount:
+    Type: Number
+
+  FrontendTargetGroupArn:
+    Type: String
+
+  ECSExecutionRoleArn:
+    Type: String
+
+Resources:
+
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 256
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !Ref ECSExecutionRoleArn
+      ContainerDefinitions:
+        - Name: frontend
+          Image: !Ref ImageUrl
+          PortMappings:
+            - ContainerPort: 80
+
+  FrontendService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ClusterName
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref FrontendTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Ref Subnets
+          SecurityGroups: [!Ref SecurityGroup]
+      LoadBalancers:
+        - TargetGroupArn: !Ref FrontendTargetGroupArn
+          ContainerName: frontend
+          ContainerPort: 80

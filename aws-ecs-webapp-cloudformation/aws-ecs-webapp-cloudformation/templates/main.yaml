@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Root stack for ECS WebApp Infrastructure
+
+################################
+# PARAMETERS
+################################
+Parameters:
+  Environment:
+    Type: String
+
+  ProjectName:
+    Type: String
+
+  # ECS Images
+  FrontendImageUrl:
+    Type: String
+
+  BackendImageUrl:
+    Type: String
+
+  DesiredCount:
+    Type: Number
+    Default: 2
+
+  # ALB / TLS
+  CertificateArn:
+    Type: String
+
+################################
+# RESOURCES
+################################
+Resources:
+
+  ################################
+  # VPC STACK
+  ################################
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/vpc.yaml
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+
+  ################################
+  # SECURITY GROUP STACK
+  ################################
+  SecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/security-groups.yaml
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+
+  ################################
+  # IAM STACK
+  ################################
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/iam.yaml
+
+  ################################
+  # ECS CLUSTER STACK
+  ################################
+  ECSClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/ecs-cluster.yaml
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+
+  ################################
+  # ALB STACK
+  ################################
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/alb.yaml
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        PublicSubnets: !GetAtt VPCStack.Outputs.PublicSubnets
+        ALBSecurityGroup: !GetAtt SecurityGroupStack.Outputs.ALBSG
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        CertificateArn: !Ref CertificateArn
+
+  ################################
+  # FRONTEND ECS STACK
+  ################################
+  FrontendECSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: ALBStack
+    Properties:
+      TemplateURL: templates/ecs-frontend.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        ImageUrl: !Ref FrontendImageUrl
+        Subnets: !GetAtt VPCStack.Outputs.PrivateAppSubnets
+        SecurityGroup: !GetAtt SecurityGroupStack.Outputs.FrontendSG
+        DesiredCount: !Ref DesiredCount
+        FrontendTargetGroupArn: !GetAtt ALBStack.Outputs.FrontendTG
+        ECSExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRoleArn
+
+  ################################
+  # BACKEND ECS STACK
+  ################################
+  BackendECSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: ALBStack
+    Properties:
+      TemplateURL: templates/ecs-backend.yaml
+      Parameters:
+        ClusterName: !GetAtt ECSClusterStack.Outputs.ClusterName
+        ImageUrl: !Ref BackendImageUrl
+        Subnets: !GetAtt VPCStack.Outputs.PrivateAppSubnets
+        SecurityGroup: !GetAtt SecurityGroupStack.Outputs.BackendSG
+        DesiredCount: !Ref DesiredCount
+        BackendTargetGroupArn: !GetAtt ALBStack.Outputs.BackendTG
+        ECSExecutionRoleArn: !GetAtt IAMStack.Outputs.ECSExecutionRoleArn
+        DBEndpoint: placeholder-db-endpoint
+
+################################
+# OUTPUTS
+################################
+Outputs:
+  ALBDNSName:
+    Description: Public ALB DNS Name
+    Value: !GetAtt ALBStack.Outputs.ALBDNSName

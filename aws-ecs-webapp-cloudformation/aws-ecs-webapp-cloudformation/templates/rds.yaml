@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Aurora PostgreSQL Serverless (No Secrets Manager)
+
+Parameters:
+  VpcId:
+    Type: String
+
+  PrivateSubnets:
+    Type: List<String>
+
+  RDSSecurityGroup:
+    Type: String
+
+  DBName:
+    Type: String
+    Default: appdb
+
+  DBUsername:
+    Type: String
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private DB subnet group
+      SubnetIds: !Ref PrivateSubnets
+
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora-postgresql
+      EngineMode: provisioned
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 2
+      DatabaseName: !Ref DBName
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref RDSSecurityGroup
+
+Outputs:
+  DBEndpoint:
+    Description: Database endpoint
+    Value: !GetAtt AuroraCluster.Endpoint.Address

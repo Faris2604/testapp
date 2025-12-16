@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Security Groups
+
+Parameters:
+  VpcId:
+    Type: String
+  Environment:
+    Type: String
+  ProjectName:
+    Type: String
+
+Resources:
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB SG
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  FrontendSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Frontend ECS SG
+      VpcId: !Ref VpcId
+
+  BackendSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Backend ECS SG
+      VpcId: !Ref VpcId
+
+  RDSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS SG
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BackendSG
+
+Outputs:
+  ALBSG:
+    Value: !Ref ALBSG
+  FrontendSG:
+    Value: !Ref FrontendSG
+  BackendSG:
+    Value: !Ref BackendSG
+  RDSSG:
+    Value: !Ref RDSSG

@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Backend ECS Service
+
+################################
+# PARAMETERS (RECEIVED FROM ROOT STACK)
+################################
+Parameters:
+  ClusterName:
+    Type: String
+    Description: ECS cluster name
+
+  ImageUrl:
+    Type: String
+    Description: Backend image from ECR
+
+  Subnets:
+    Type: List<String>
+    Description: Private subnets for ECS tasks
+
+  SecurityGroup:
+    Type: String
+    Description: Backend ECS security group
+
+  DesiredCount:
+    Type: Number
+    Description: Number of backend tasks
+
+  BackendTargetGroupArn:
+    Type: String
+    Description: Target Group ARN from ALB stack
+
+  ECSExecutionRoleArn:
+    Type: String
+    Description: ECS execution role ARN
+
+  DBEndpoint:
+    Type: String
+    Description: Aurora PostgreSQL endpoint
+
+################################
+# RESOURCES
+################################
+Resources:
+
+  ################################
+  # TASK DEFINITION
+  ################################
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 512
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSExecutionRoleArn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref ImageUrl
+          PortMappings:
+            - ContainerPort: 8080
+          Environment:
+            - Name: DB_HOST
+              Value: !Ref DBEndpoint
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /ecs/backend
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  ################################
+  # ECS SERVICE
+  ################################
+  BackendService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: backend-service
+      Cluster: !Ref ClusterName
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref BackendTaskDefinition
+
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref Subnets
+          SecurityGroups:
+            - !Ref SecurityGroup
+
+      ################################
+      # TARGET GROUP ATTACHMENT
+      ################################
+      LoadBalancers:
+        - TargetGroupArn: !Ref BackendTargetGroupArn
+          ContainerName: backend
+          ContainerPort: 8080

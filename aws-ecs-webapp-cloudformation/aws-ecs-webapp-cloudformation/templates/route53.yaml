@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Route53 DNS record for Frontend
+
+Parameters:
+  HostedZoneId:
+    Type: String
+  DomainName:
+    Type: String
+  ALBDNSName:
+    Type: String
+  ALBHostedZoneId:
+    Type: String
+
+Resources:
+  FrontendDNS:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !Ref ALBDNSName
+        HostedZoneId: !Ref ALBHostedZoneId
